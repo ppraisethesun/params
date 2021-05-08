@@ -7,14 +7,14 @@ defmodule Params.Def do
     {full, with_alias} = module_name(func_name, __CALLER__)
 
     defmod =
-      quote location: :keep do
-        defmodule unquote(full) do
-          Params.Def.defschema(unquote(schema))
-          Code.eval_quoted(unquote(block), [], __ENV__)
+      quote location: :keep, bind_quoted: [full: full, schema: schema, block: block] do
+        defmodule full do
+          Params.Def.defschema(schema)
+          Code.eval_quoted(block, [], __ENV__)
         end
       end
 
-    cast_func = def_cast_func(full, func_name)
+    cast_func = Module.eval_quoted(__CALLER__.module, def_cast_func(full, func_name))
 
     [defmod, with_alias, cast_func]
   end
@@ -24,13 +24,13 @@ defmodule Params.Def do
     {full, with_alias} = module_name(func_name, __CALLER__)
 
     defmod =
-      quote location: :keep do
-        defmodule unquote(full) do
-          Params.Def.defschema(unquote(schema))
+      quote location: :keep, bind_quoted: [full: full, schema: schema] do
+        defmodule full do
+          Params.Def.defschema(schema)
         end
       end
 
-    cast_func = def_cast_func(full, func_name)
+    cast_func = Module.eval_quoted(__CALLER__.module, def_cast_func(full, func_name))
 
     [defmod, with_alias, cast_func]
   end
@@ -211,7 +211,7 @@ defmodule Params.Def do
     {full, with_alias}
   end
 
-  defp def_cast_func(mod, func_name) do
+  def def_cast_func(mod, func_name) do
     quote location: :keep, bind_quoted: [mod: mod, func_name: func_name] do
       def unquote(func_name)(params, options \\ []) do
         case Keyword.get(options, :struct, false) do

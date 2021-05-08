@@ -260,4 +260,29 @@ defmodule DefParamsTest do
              }
            }
   end
+
+  @default 1
+  defparams(context, %{
+    attribute!: [
+      field: :integer,
+      default: @default
+    ]
+  })
+
+  test "has access to context" do
+    assert {:ok, _} = context(%{})
+  end
+
+  defparams context_with_block, %{
+    attribute!: [
+      field: :integer,
+      default: @default
+    ]
+  } do
+    nil
+  end
+
+  test "has access to context with block" do
+    assert {:ok, _} = context_with_block(%{})
+  end
 end
