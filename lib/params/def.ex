@@ -14,15 +14,7 @@ defmodule Params.Def do
         end
       end
 
-    cast_func =
-      quote location: :keep, bind_quoted: [full: full, func_name: func_name] do
-        def unquote(func_name)(params, options \\ []) do
-          case Keyword.get(options, :struct, false) do
-            true -> unquote(full).from(params, options) |> Params.data()
-            false -> unquote(full).from(params, options) |> Params.to_map()
-          end
-        end
-      end
+    cast_func = def_cast_func(full, func_name)
 
     [defmod, with_alias, cast_func]
   end
@@ -38,15 +30,7 @@ defmodule Params.Def do
         end
       end
 
-    cast_func =
-      quote location: :keep, bind_quoted: [full: full, func_name: func_name] do
-        def unquote(func_name)(params, options \\ []) do
-          case Keyword.get(options, :struct, false) do
-            true -> unquote(full).from(params, options) |> Params.data()
-            false -> unquote(full).from(params, options) |> Params.to_map()
-          end
-        end
-      end
+    cast_func = def_cast_func(full, func_name)
 
     [defmod, with_alias, cast_func]
   end
@@ -59,9 +43,8 @@ defmodule Params.Def do
 
       normalized_schema
       |> Params.Def.build_nested_schemas()
-      |> Enum.each(fn
-        {name, content} ->
-          Module.create(name, content, Macro.Env.location(__ENV__))
+      |> Enum.each(fn {name, content} ->
+        Module.create(name, content, Macro.Env.location(__ENV__))
       end)
     end
   end
@@ -90,10 +73,6 @@ defmodule Params.Def do
     build_nested_schemas(rest, acc)
   end
 
-  def module_concat(parent, scope, name) do
-    Module.concat([parent, scope, Macro.camelize("#{name}")])
-  end
-
   def module_concat(parent, name) do
     Module.concat([parent, Macro.camelize("#{name}")])
   end
@@ -103,8 +82,8 @@ defmodule Params.Def do
       use Params.Schema
 
       @schema unquote(schema)
-      @required unquote(field_names(schema, &is_required?/1))
-      @optional unquote(field_names(schema, &is_optional?/1))
+      @required unquote(field_names(schema, &required?/1))
+      @optional unquote(field_names(schema, &optional?/1))
 
       schema do
         (unquote_splicing(schema_fields(schema)))
@@ -112,18 +91,13 @@ defmodule Params.Def do
     end
   end
 
-  defp is_required?(field_schema) do
-    Keyword.get(field_schema, :required, false)
-  end
-
-  defp is_optional?(field_schema) do
-    !is_required?(field_schema)
-  end
+  defp required?(field_schema), do: Keyword.get(field_schema, :required, false)
+  defp optional?(field_schema), do: !required?(field_schema)
 
   defp field_names(schema, filter) do
-    for field <- schema,
-        apply(filter, [field]),
-        do: Keyword.get(field, :name)
+    schema
+    |> Enum.filter(filter)
+    |> Enum.map(&Keyword.get(&1, :name))
   end
 
   defp schema_fields(schema) do
@@ -131,12 +105,10 @@ defmodule Params.Def do
   end
 
   defp schema_field(meta) do
-    {call, name, type, opts} = {
-      field_call(meta),
-      Keyword.get(meta, :name),
-      field_type(meta),
-      field_options(meta)
-    }
+    call = field_call(meta)
+    name = Keyword.get(meta, :name)
+    type = field_type(meta)
+    opts = field_options(meta)
 
     quote do
       unquote(call)(unquote(name), unquote(type), unquote(opts))
@@ -237,5 +209,16 @@ defmodule Params.Def do
     with_alias = {:alias, meta, [full, [as: alias, warn: false]]}
 
     {full, with_alias}
+  end
+
+  defp def_cast_func(mod, func_name) do
+    quote location: :keep, bind_quoted: [mod: mod, func_name: func_name] do
+      def unquote(func_name)(params, options \\ []) do
+        case Keyword.get(options, :struct, false) do
+          true -> unquote(mod).from(params, options) |> Params.data()
+          false -> unquote(mod).from(params, options) |> Params.to_map()
+        end
+      end
+    end
   end
 end

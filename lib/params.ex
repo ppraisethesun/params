@@ -120,8 +120,8 @@ defmodule Params do
 
       schema ->
         schema
-        |> Stream.filter(is_embed_default)
-        |> Stream.map(default_embed)
+        |> Enum.filter(is_embed_default)
+        |> Enum.map(default_embed)
         |> Enum.into(module |> struct() |> Map.from_struct())
     end
   end
@@ -181,7 +181,7 @@ defmodule Params do
     types = module.__changeset__
 
     names
-    |> Stream.map(fn x -> String.to_atom("#{x}") end)
+    |> Enum.map(fn x -> String.to_atom("#{x}") end)
     |> Enum.reduce({[], []}, fn name, {fields, relations} ->
       case Map.get(types, name) do
         {type, _} when type in @relations ->
