@@ -50,7 +50,7 @@ defmodule DefParamsTest do
     breed!: :string,
     age_min: :integer,
     age_max: :integer,
-    near_location!: {:embeds_one, __MODULE__.LocationParams}
+    near_location!: {:embeds_one, LocationParams}
   })
 
   test "puppy module has list of required fields" do
@@ -83,7 +83,7 @@ defmodule DefParamsTest do
     breed!: :string,
     age_min: :integer,
     age_max: :integer,
-    near_locations!: {:embeds_many, __MODULE__.LocationParams}
+    near_locations!: {:embeds_many, LocationParams}
   })
 
   test "dragon module has list of required fields" do

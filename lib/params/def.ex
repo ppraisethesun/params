@@ -2,54 +2,53 @@ defmodule Params.Def do
   @moduledoc false
 
   @doc false
-  defmacro defparams({name, _, _}, schema, do: block) do
+  defmacro defparams({func_name, _, _}, schema, do: block) do
     block = Macro.escape(block)
+    {full, with_alias} = module_name(func_name, __CALLER__)
 
-    quote bind_quoted: [name: name, schema: schema, block: block] do
-      module_name = Params.Def.module_concat(__MODULE__, name)
-
-      defmodule module_name do
-        Params.Def.defschema(schema)
-        Code.eval_quoted(block, [], __ENV__)
+    defmod =
+      quote location: :keep do
+        defmodule unquote(full) do
+          Params.Def.defschema(unquote(schema))
+          Code.eval_quoted(unquote(block), [], __ENV__)
+        end
       end
 
-      Module.eval_quoted(
-        __MODULE__,
-        quote do
-          def unquote(name)(params, options \\ []) do
-            unquote(module_name).from(params, options)
-
-            case Keyword.get(options, :struct, false) do
-              true -> unquote(module_name).from(params, options) |> Params.data()
-              false -> unquote(module_name).from(params, options) |> Params.to_map()
-            end
+    cast_func =
+      quote location: :keep, bind_quoted: [full: full, func_name: func_name] do
+        def unquote(func_name)(params, options \\ []) do
+          case Keyword.get(options, :struct, false) do
+            true -> unquote(full).from(params, options) |> Params.data()
+            false -> unquote(full).from(params, options) |> Params.to_map()
           end
         end
-      )
-    end
+      end
+
+    [defmod, with_alias, cast_func]
   end
 
   @doc false
-  defmacro defparams({name, _, _}, schema) do
-    quote bind_quoted: [name: name, schema: schema] do
-      module_name = Params.Def.module_concat(__MODULE__, name)
+  defmacro defparams({func_name, _, _}, schema) do
+    {full, with_alias} = module_name(func_name, __CALLER__)
 
-      defmodule module_name do
-        Params.Def.defschema(schema)
+    defmod =
+      quote location: :keep do
+        defmodule unquote(full) do
+          Params.Def.defschema(unquote(schema))
+        end
       end
 
-      Module.eval_quoted(
-        __MODULE__,
-        quote do
-          def unquote(name)(params, options \\ []) do
-            case Keyword.get(options, :struct, false) do
-              true -> unquote(module_name).from(params, options) |> Params.data()
-              false -> unquote(module_name).from(params, options) |> Params.to_map()
-            end
+    cast_func =
+      quote location: :keep, bind_quoted: [full: full, func_name: func_name] do
+        def unquote(func_name)(params, options \\ []) do
+          case Keyword.get(options, :struct, false) do
+            true -> unquote(full).from(params, options) |> Params.data()
+            false -> unquote(full).from(params, options) |> Params.to_map()
           end
         end
-      )
-    end
+      end
+
+    [defmod, with_alias, cast_func]
   end
 
   @doc false
@@ -228,5 +227,15 @@ defmodule Params.Def do
 
   defp normalize_field([value], options) do
     [field: {:array, value}] ++ options
+  end
+
+  defp module_name(func_name, env) do
+    alias = Module.concat([Macro.camelize("#{func_name}")])
+    full = Module.concat(env.module, alias)
+
+    meta = [defined: full, context: env.module]
+    with_alias = {:alias, meta, [full, [as: alias, warn: false]]}
+
+    {full, with_alias}
   end
 end
