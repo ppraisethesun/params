@@ -6,7 +6,7 @@ defmodule Params.Def do
     block = Macro.escape(block)
 
     quote bind_quoted: [name: name, schema: schema, block: block] do
-      module_name = Params.Def.module_concat(Params, __MODULE__, name)
+      module_name = Params.Def.module_concat(__MODULE__, name)
 
       defmodule module_name do
         Params.Def.defschema(schema)
@@ -32,7 +32,7 @@ defmodule Params.Def do
   @doc false
   defmacro defparams({name, _, _}, schema) do
     quote bind_quoted: [name: name, schema: schema] do
-      module_name = Params.Def.module_concat(Params, __MODULE__, name)
+      module_name = Params.Def.module_concat(__MODULE__, name)
 
       defmodule module_name do
         Params.Def.defschema(schema)
