@@ -213,11 +213,8 @@ defmodule Params.Def do
 
   def def_cast_func(mod, func_name) do
     quote location: :keep, bind_quoted: [mod: mod, func_name: func_name] do
-      def unquote(func_name)(params, options \\ []) do
-        case Keyword.get(options, :struct, false) do
-          true -> unquote(mod).from(params, options) |> Params.data()
-          false -> unquote(mod).from(params, options) |> Params.to_map()
-        end
+      def unquote(func_name)(params, opts \\ []) do
+        unquote(mod).cast(params, opts)
       end
     end
   end
