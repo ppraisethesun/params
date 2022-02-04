@@ -1,7 +1,47 @@
 defmodule Params.SchemaTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Ecto.Changeset
+
+  describe "use with schema" do
+    defmodule UseSchema do
+      use Params
+
+      defparams(nested, %{
+        name!: :string
+      })
+
+      use Params.Schema, %{
+        field!: :integer,
+        nested!: {:embeds_one, Nested},
+        optional: :string
+      }
+    end
+
+    test "module has schema types" do
+      assert %{field: :integer, nested: {:embed, _}} = UseSchema.__changeset__()
+    end
+
+    test "__required__ is set from field names" do
+      assert [:nested, :field] = Params.Schema.__required__(UseSchema)
+    end
+
+    test "__optional__ is set from field names" do
+      assert [:optional] = Params.Schema.__optional__(UseSchema)
+    end
+
+    test "cast returns an ok if params are valid" do
+      assert {:ok, _} =
+               UseSchema.cast(%{
+                 field: 1,
+                 nested: %{name: "asd"}
+               })
+    end
+
+    test "cast returns an error if params are invalid" do
+      assert {:error, %Changeset{valid?: false}} = UseSchema.cast(%{required: nil})
+    end
+  end
 
   describe "use without opts" do
     defmodule PetParams do

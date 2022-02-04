@@ -39,6 +39,14 @@ defmodule Params.Schema do
     end
   end
 
+  defmacro __using__(schema) do
+    quote bind_quoted: [schema: schema] do
+      import Params.Def
+
+      defschema(schema)
+    end
+  end
+
   @doc false
   defmacro schema(do: definition) do
     quote do
