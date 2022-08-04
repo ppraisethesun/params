@@ -53,7 +53,7 @@ defmodule Params.Def do
   def build_nested_schemas([], acc), do: acc
 
   def build_nested_schemas([schema | rest], acc) do
-    embedded = Keyword.has_key?(schema, :embeds)
+    embedded = Keyword.has_key?(schema, :embeds) and schema[:inline]
 
     acc =
       if embedded do
@@ -127,7 +127,7 @@ defmodule Params.Def do
         :embeds_many
 
       Keyword.get(meta, :embeds) ->
-        "embeds_#{Keyword.get(meta, :cardinality, :one)}" |> String.to_atom()
+        "embeds_#{Keyword.fetch!(meta, :cardinality)}" |> String.to_atom()
     end
   end
 
@@ -137,7 +137,7 @@ defmodule Params.Def do
 
     cond do
       Keyword.get(meta, :field) -> Keyword.get(meta, :field)
-      Keyword.get(meta, :embeds) -> module_concat(module, name)
+      Keyword.get(meta, :embeds) && meta[:inline] -> module_concat(module, name)
       Keyword.get(meta, :embeds_one) -> Keyword.get(meta, :embeds_one)
       Keyword.get(meta, :embeds_many) -> Keyword.get(meta, :embeds_many)
     end
@@ -149,6 +149,7 @@ defmodule Params.Def do
       :name,
       :field,
       :embeds,
+      :inline,
       :embeds_one,
       :embeds_many,
       :required,
@@ -173,12 +174,13 @@ defmodule Params.Def do
   end
 
   defp normalize_field({:embeds_many, embed_module}, options) do
-    [embeds_many: embed_module] ++ options
+    [embeds: Params.Schema.__schema__(embed_module), embeds_many: embed_module] ++ options
   end
 
   defp normalize_field(schema = %{}, options) do
     module = module_concat(Keyword.get(options, :module), Keyword.get(options, :name))
-    [embeds: normalize_schema(schema, module)] ++ options
+
+    [embeds: normalize_schema(schema, module), inline: true, cardinality: :one] ++ options
   end
 
   defp normalize_field(value, options) when is_atom(value) do
@@ -190,7 +192,7 @@ defmodule Params.Def do
   end
 
   defp normalize_field([x], options) when is_map(x) do
-    [cardinality: :many] ++ normalize_field(x, options)
+    Keyword.put(normalize_field(x, options), :cardinality, :many)
   end
 
   defp normalize_field([{:field, x} | kw], options) do

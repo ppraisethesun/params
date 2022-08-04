@@ -84,15 +84,15 @@ defmodule Params.Schema do
 
         output =
           case Keyword.get(opts, :struct) do
-            true -> &Params.Schema.to_struct/1
-            false -> &Params.Schema.to_map/1
+            true -> &Params.Schema.to_struct/2
+            false -> &Params.Schema.to_map/2
           end
 
         __MODULE__
         |> struct()
         |> Ecto.Changeset.change()
         |> on_cast.(params)
-        |> output.()
+        |> output.(params)
       end
 
       @impl true
@@ -136,24 +136,26 @@ defmodule Params.Schema do
   ```
   """
 
-  def to_map(%Changeset{data: %{__struct__: module}, valid?: true} = ch) do
+  def to_map(%Changeset{data: %{__struct__: module}, valid?: true} = ch, params) do
     ecto_defaults = plain_defaults_defined_by_ecto_schema(module)
     params_defaults = module |> __schema__() |> defaults()
     change = changes(ch)
+    explicit_nils = module |> __schema__() |> nils(params)
 
     {:ok,
      ecto_defaults
      |> deep_merge(params_defaults)
-     |> deep_merge(change)}
+     |> deep_merge(change)
+     |> deep_merge(explicit_nils)}
   end
 
-  def to_map(changeset), do: {:error, changeset}
+  def to_map(changeset, _), do: {:error, changeset}
 
-  def to_struct(%Changeset{valid?: true} = changeset) do
+  def to_struct(%Changeset{valid?: true} = changeset, _) do
     {:ok, extract_data(changeset)}
   end
 
-  def to_struct(changeset), do: {:error, changeset}
+  def to_struct(changeset, _), do: {:error, changeset}
 
   defp extract_data(%Changeset{data: %{__struct__: module} = data, valid?: true} = changeset) do
     default_embeds = default_embeds_from_schema(module)
@@ -215,7 +217,7 @@ defmodule Params.Schema do
   end
 
   @doc false
-  def changeset(model = %{__struct__: _}, params) do
+  def changeset(%{__struct__: _} = model, params) do
     model
     |> Changeset.change()
     |> changeset(params)
@@ -248,14 +250,31 @@ defmodule Params.Schema do
     Map.merge(map_1, map_2, &deep_merge_conflict/3)
   end
 
+  defp deep_merge(l1, l2) when is_list(l1) and is_list(l2) do
+    l2
+    |> Enum.reduce({[], l1}, fn
+      e2, {acc, [e1 | l1_rest]} ->
+        {[deep_merge(e2, e1) | acc], l1_rest}
+
+      e2, {acc, []} ->
+        {[e2 | acc], []}
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+  end
+
   defp deep_merge_conflict(_k, %{} = m1, %{} = m2) do
     deep_merge(m1, m2)
   end
 
+  defp deep_merge_conflict(_k, l1, l2) when is_list(l1) and is_list(l2) do
+    deep_merge(l1, l2)
+  end
+
   defp deep_merge_conflict(_k, _v1, v2), do: v2
 
-  defp defaults(params), do: defaults(params, %{}, [])
-  defp defaults(params, acc, path)
+  defp defaults(schema), do: defaults(schema, %{}, [])
+  defp defaults(schema, acc, path)
   defp defaults([], acc, _path), do: acc
   defp defaults(nil, _acc, _path), do: %{}
 
@@ -274,9 +293,10 @@ defmodule Params.Schema do
       |> Enum.reverse()
       |> Enum.map(fn nested_name ->
         fn :get_and_update, data, next ->
-          with {nil, inner_data} <- next.(data[nested_name] || %{}),
-               data = Map.put(data, nested_name, inner_data),
-               do: {nil, data}
+          with {nil, inner_data} <- next.(data[nested_name] || %{}) do
+            data = Map.put(data, nested_name, inner_data)
+            {nil, data}
+          end
         end
       end)
 
@@ -286,6 +306,91 @@ defmodule Params.Schema do
 
   defp defaults([%{} | rest], acc, path) do
     defaults(rest, acc, path)
+  end
+
+  defp nils(schema, params), do: nils(schema, params, %{}, [])
+
+  defp nils(schema, params, acc, path)
+  defp nils([], _params, acc, _path), do: acc
+  defp nils(nil, _params, _acc, _path), do: %{}
+
+  defp nils([opts | rest], params, acc, path) when is_list(opts) do
+    nils([Enum.into(opts, %{}) | rest], params, acc, path)
+  end
+
+  defp nils(
+         [%{name: name, embeds: embed_schema, cardinality: :one, inline: true} | rest],
+         params,
+         acc,
+         path
+       ) do
+    embed_nils(:one, embed_schema, name, rest, params, acc, path)
+  end
+
+  defp nils(
+         [%{name: name, embeds: embed_schema, cardinality: :many, inline: true} | rest],
+         params,
+         acc,
+         path
+       ) do
+    embed_nils(:many, embed_schema, name, rest, params, acc, path)
+  end
+
+  defp nils([%{name: name, embeds_one: embed_module} | rest], params, acc, path) do
+    embed_nils(:one, __schema__(embed_module), name, rest, params, acc, path)
+  end
+
+  defp nils([%{name: name, embeds_many: embed_module} | rest], params, acc, path) do
+    embed_nils(:many, __schema__(embed_module), name, rest, params, acc, path)
+  end
+
+  defp nils([%{name: name} | rest], params, acc, path) do
+    case fetch_change(params, name) do
+      {:ok, nil} ->
+        funs =
+          [name | path]
+          |> Enum.reverse()
+          |> Enum.map(fn nested_name ->
+            fn :get_and_update, data, next ->
+              with {nil, inner_data} <- next.(data[nested_name] || %{}) do
+                data = Map.put(data, nested_name, inner_data)
+                {nil, data}
+              end
+            end
+          end)
+
+        acc = put_in(acc, funs, nil)
+        nils(rest, params, acc, path)
+
+      _ ->
+        nils(rest, params, acc, path)
+    end
+  end
+
+  defp embed_nils(:one, embed_schema, name, rest, params, acc, path) do
+    case fetch_change(params, name) do
+      {:ok, value} ->
+        embed_nils = nils(embed_schema, value, %{}, [])
+        nils(rest, params, Map.put(acc, name, embed_nils), path)
+
+      _ ->
+        nils(rest, params, acc, path)
+    end
+  end
+
+  defp embed_nils(:many, embed_schema, name, rest, params, acc, path) do
+    case fetch_change(params, name) do
+      {:ok, values} ->
+        embed_nils =
+          Enum.map(values, fn p ->
+            nils(embed_schema, p, %{}, [])
+          end)
+
+        nils(rest, params, Map.put(acc, name, embed_nils), path)
+
+      _ ->
+        nils(rest, params, acc, path)
+    end
   end
 
   defp changes(%Changeset{} = ch) do
@@ -305,6 +410,13 @@ defmodule Params.Schema do
     |> Map.delete(:__meta__)
     |> Enum.reject(fn {_, v} -> is_nil(v) end)
     |> Enum.into(%{})
+  end
+
+  defp fetch_change(params, key) when is_atom(key) do
+    case Map.fetch(params, key) do
+      {:ok, _} = ok -> ok
+      _ -> Map.fetch(params, "#{key}")
+    end
   end
 
   @doc false

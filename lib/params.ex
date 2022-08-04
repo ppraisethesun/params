@@ -35,6 +35,12 @@ defmodule Params do
 
     ...> kid(%{name: "hugo", age: 5})
     {:ok, %{name: "hugo", age: 5}}
+
+    ...> kid(%{name: "hugo", age: nil})
+    {:ok, %{name: "hugo", age: nil}}
+
+    ...> kid(%{name: "hugo"})
+    {:ok, %{name: "hugo"}}
   ```
   """
 
