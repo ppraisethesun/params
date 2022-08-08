@@ -42,6 +42,32 @@ defmodule DefParamsTest do
       assert {:ok, _map} = kitten(params)
     end
 
+    test "returns fields explicitly set to nil" do
+      params = %{
+        "breed" => "Russian Blue",
+        "age_min" => nil,
+        "near_location" => %{
+          "latitude" => nil,
+          "longitude" => "-90.0"
+        }
+      }
+
+      assert {:ok, %{age_min: nil, near_location: %{latitude: nil}} = map} = kitten(params)
+      refute Map.has_key?(map, :age_max)
+
+      params = %{
+        breed: "Russian Blue",
+        age_min: nil,
+        near_location: %{
+          latitude: nil,
+          longitude: "-90.0"
+        }
+      }
+
+      assert {:ok, %{age_min: nil, near_location: %{latitude: nil}} = map} = kitten(params)
+      refute Map.has_key?(map, :age_max)
+    end
+
     test "returns struct when params are valid" do
       params = %{
         "breed" => "Russian Blue",
@@ -59,8 +85,8 @@ defmodule DefParamsTest do
 
   describe "defparams name, schema. embeds" do
     defparams(location_params, %{
-      latitude!: :float,
-      longitude!: :float
+      latitude: :float,
+      longitude: :float
     })
 
     defparams(puppy, %{
@@ -94,6 +120,32 @@ defmodule DefParamsTest do
       }
 
       assert {:ok, %{}} = puppy(params)
+    end
+
+    test "returns fields explicitly set to nil within embeds_one" do
+      params = %{
+        "breed" => "Russian Blue",
+        "age_min" => "0",
+        "age_max" => "4",
+        "near_location" => %{
+          "latitude" => nil,
+          "longitude" => "-90.0"
+        }
+      }
+
+      assert {:ok, %{near_location: %{latitude: nil}}} = puppy(params)
+
+      params = %{
+        breed: "Russian Blue",
+        age_min: "0",
+        age_max: "4",
+        near_location: %{
+          latitude: nil,
+          longitude: "-90.0"
+        }
+      }
+
+      assert {:ok, %{near_location: %{latitude: nil}}} = puppy(params)
     end
 
     test "puppy returns struct when params are valid" do
@@ -147,6 +199,26 @@ defmodule DefParamsTest do
       }
 
       assert {:ok, %{}} = dragon(params)
+    end
+
+    test "returns fields explicitly set to nil within embeds" do
+      params = %{
+        "breed" => "Russian Blue",
+        "age_min" => "0",
+        "age_max" => "4",
+        "near_locations" => [
+          %{
+            "latitude" => nil,
+            "longitude" => nil
+          },
+          %{}
+        ]
+      }
+
+      assert {:ok, %{near_locations: [%{latitude: nil, longitude: nil}, second_location]}} =
+               dragon(params)
+
+      assert second_location == %{}
     end
 
     test "dragon returns struct when all data is ok" do
@@ -259,6 +331,14 @@ defmodule DefParamsTest do
     test "puts default values in struct" do
       assert {:ok, struct} = schema_options(%{})
       assert %{foo: "FOO"} = struct
+    end
+
+    test "nil overrides default value" do
+      assert {:ok, struct} = schema_options(%{foo: nil})
+      assert %{foo: nil} = struct
+
+      assert {:ok, struct} = schema_options(%{"foo" => nil})
+      assert %{foo: nil} = struct
     end
 
     defparams(default_nested, %{
