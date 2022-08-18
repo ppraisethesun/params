@@ -367,8 +367,15 @@ defmodule Params.Schema do
     end
   end
 
+  defp embed_nils(_, _, _, _, nil, _, _) do
+    nil
+  end
+
   defp embed_nils(:one, embed_schema, name, rest, params, acc, path) do
     case fetch_change(params, name) do
+      {:ok, nil} ->
+        Map.put(acc, name, nil)
+
       {:ok, value} ->
         embed_nils = nils(embed_schema, value, %{}, [])
         nils(rest, params, Map.put(acc, name, embed_nils), path)
@@ -412,11 +419,15 @@ defmodule Params.Schema do
     |> Enum.into(%{})
   end
 
-  defp fetch_change(params, key) when is_atom(key) do
+  defp fetch_change(%{} = params, key) when is_atom(key) do
     case Map.fetch(params, key) do
       {:ok, _} = ok -> ok
       _ -> Map.fetch(params, "#{key}")
     end
+  end
+
+  defp fetch_change(_, _) do
+    :error
   end
 
   @doc false

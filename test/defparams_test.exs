@@ -421,4 +421,19 @@ defmodule DefParamsTest do
       assert map.attribute == 1
     end
   end
+
+  describe "embeds" do
+    defparams(embeds, %{
+      one: %{title!: :string},
+      many: [%{description!: :string}]
+    })
+  end
+
+  test "returns embeds_one explicitly set to nils" do
+    assert {:ok, %{one: nil}} = embeds(%{one: nil})
+  end
+
+  test "can't set embeds_many to nil" do
+    assert {:error, _} = embeds(%{many: nil})
+  end
 end
