@@ -170,7 +170,7 @@ defmodule Params.Def do
   end
 
   defp normalize_field({:embeds_one, embed_module}, options) do
-    [embeds_one: embed_module] ++ options
+    [embeds: Params.Schema.__schema__(embed_module), embeds_one: embed_module] ++ options
   end
 
   defp normalize_field({:embeds_many, embed_module}, options) do
