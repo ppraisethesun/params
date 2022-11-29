@@ -210,7 +210,7 @@ defmodule Params.Schema do
     {optional, optional_relations} = relation_partition(module, __optional__(module))
 
     changeset
-    |> Changeset.cast(params, required ++ optional)
+    |> Changeset.cast(params, required ++ optional, empty_values: [])
     |> Changeset.validate_required(required)
     |> cast_relations(required_relations, required: true)
     |> cast_relations(optional_relations, [])
