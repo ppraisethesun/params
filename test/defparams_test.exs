@@ -3,6 +3,7 @@ defmodule DefParamsTest do
   use Params
   import Ecto.Changeset
 
+  alias DefParamsTest.DefaultNested
   alias Ecto.Changeset
 
   describe "defparams name, schema. nested" do
@@ -355,12 +356,19 @@ defmodule DefParamsTest do
       }
     })
 
+    @tag :batman
     test "embeds with defaults are not nil" do
-      assert {:ok, data} = default_nested(%{}, struct: true)
-      assert data.bat.man == "BATMAN"
-      assert data.bat.wo.man == "BATWOMAN"
-      assert %{mo: nil} = data.bat
-      assert nil == data.foo
+      assert {:ok,
+              %DefaultNested{
+                foo: nil,
+                bat: %DefaultNested.Bat{
+                  man: "BATMAN",
+                  wo: %DefaultNested.Bat.Wo{
+                    man: "BATWOMAN"
+                  },
+                  mo: nil
+                }
+              }} = default_nested(%{}, struct: true)
     end
 
     test "to_map works on nested schemas with default values and empty input" do

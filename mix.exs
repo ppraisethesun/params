@@ -8,7 +8,8 @@ defmodule Params.Mixfile do
     {:ex_doc, "~> 0.19", only: :dev, runtime: false},
     {:earmark, ">= 0.0.0", only: :dev, runtime: false},
     {:dialyxir, "~> 0.5", only: :dev, runtime: false},
-    {:mix_test_interactive, "~> 1.0", only: [:dev], runtime: false}
+    {:mix_test_interactive, "~> 1.0", only: [:dev], runtime: false},
+    {:recode, "~> 0.4", only: :dev}
   ]
 
   def project do

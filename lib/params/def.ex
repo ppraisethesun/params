@@ -180,7 +180,7 @@ defmodule Params.Def do
   defp normalize_field(schema = %{}, options) do
     module = module_concat(Keyword.get(options, :module), Keyword.get(options, :name))
 
-    [embeds: normalize_schema(schema, module), inline: true, cardinality: :one] ++ options
+    [embeds: normalize_schema(schema, module), inline: true, embeds_one: module] ++ options
   end
 
   defp normalize_field(value, options) when is_atom(value) do
@@ -191,8 +191,11 @@ defmodule Params.Def do
     normalize_field([x], options)
   end
 
-  defp normalize_field([x], options) when is_map(x) do
-    Keyword.put(normalize_field(x, options), :cardinality, :many)
+  defp normalize_field([schema], options) when is_map(schema) do
+    module = module_concat(Keyword.get(options, :module), Keyword.get(options, :name))
+    [embeds: normalize_schema(schema, module), inline: true, embeds_many: module] ++ options
+
+    # Keyword.put(normalize_field(x, options), :cardinality, :many)
   end
 
   defp normalize_field([{:field, x} | kw], options) do

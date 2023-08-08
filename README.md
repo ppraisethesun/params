@@ -1,5 +1,7 @@
 # Params
 
+# Do not use my fork, I break it all the time
+
 Easily define parameter structure and validate/cast with [Ecto.Schema][Ecto.Schema]
 
 [![Hex.pm](https://img.shields.io/hexpm/v/params.svg)](http://hex.pm/packages/params)
@@ -12,6 +14,7 @@ Easily define parameter structure and validate/cast with [Ecto.Schema][Ecto.Sche
 - [API Documentation](https://hexdocs.pm/params/)
 
 ## Installation
+
 
 [Available in Hex](https://hex.pm/packages/params), the package can be installed as:
 
