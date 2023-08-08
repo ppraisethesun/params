@@ -157,16 +157,25 @@ defmodule Params.Schema do
 
   def to_struct(changeset, _), do: {:error, changeset}
 
-  defp extract_data(%Changeset{data: %{__struct__: module} = data, valid?: true}) do
+  defp extract_data(%Changeset{data: %{__struct__: module} = data, valid?: true} = changeset) do
     default_embeds = default_embeds_from_schema(module)
 
-    default_embeds
-    |> Map.from_struct()
-    |> Enum.reduce(data, fn {field, default_value}, acc ->
-      Map.update!(acc, field, fn
-        nil -> default_value
-        value -> value
+    default =
+      default_embeds
+      |> Map.from_struct()
+      |> Enum.reduce(data, fn {field, default_value}, acc ->
+        Map.update!(acc, field, fn
+          nil -> default_value
+          value -> value
+        end)
       end)
+
+    Enum.reduce(changeset.changes, default, fn {field, value}, acc ->
+      case value do
+        %Changeset{} -> Map.put(acc, field, extract_data(value))
+        x = [%Changeset{} | _] -> Map.put(acc, field, Enum.map(x, &extract_data/1))
+        _ -> Map.put(acc, field, value)
+      end
     end)
   end
 

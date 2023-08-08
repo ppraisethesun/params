@@ -5,6 +5,7 @@ defmodule Params.Mixfile do
 
   @deps [
     {:ecto, "~> 2.0 or ~> 3.0"},
+    {:ecto_sql, "~> 3.6"},
     {:ex_doc, "~> 0.19", only: :dev, runtime: false},
     {:earmark, ">= 0.0.0", only: :dev, runtime: false},
     {:dialyxir, "~> 0.5", only: :dev, runtime: false},
