@@ -46,7 +46,7 @@ defmodule Params do
 
   @doc false
   defmacro __using__([]) do
-    quote do
+    quote location: :keep do
       import Params.Def, only: [defparams: 2, defparams: 3, defschema: 1]
     end
   end

@@ -37,7 +37,7 @@ defmodule Params.Def do
 
   @doc false
   defmacro defschema(schema) do
-    quote bind_quoted: [schema: schema] do
+    quote location: :keep, bind_quoted: [schema: schema] do
       normalized_schema = Params.Def.normalize_schema(schema, __MODULE__)
       Module.eval_quoted(__MODULE__, Params.Def.gen_root_schema(normalized_schema))
 
@@ -78,7 +78,7 @@ defmodule Params.Def do
   end
 
   def gen_root_schema(schema) do
-    quote do
+    quote location: :keep do
       use Params.Schema
 
       @schema unquote(schema)
@@ -159,8 +159,20 @@ defmodule Params.Def do
 
   def normalize_schema(dict, module) do
     Enum.reduce(dict, [], fn {k, v}, list ->
-      [normalize_field({module, k, v}) | list]
+      field =
+        {module, k, v}
+        |> normalize_field()
+        |> escape_default()
+
+      [field | list]
     end)
+  end
+
+  defp escape_default(field) do
+    case field[:default] do
+      nil -> field
+      default -> Keyword.put(field, :default, Macro.escape(default))
+    end
   end
 
   defp normalize_field({module, k, v}) do
@@ -194,8 +206,6 @@ defmodule Params.Def do
   defp normalize_field([schema], options) when is_map(schema) do
     module = module_concat(Keyword.get(options, :module), Keyword.get(options, :name))
     [embeds: normalize_schema(schema, module), inline: true, embeds_many: module] ++ options
-
-    # Keyword.put(normalize_field(x, options), :cardinality, :many)
   end
 
   defp normalize_field([{:field, x} | kw], options) do
