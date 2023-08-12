@@ -49,6 +49,17 @@ defmodule Params.Schema.Field do
   end
 
   defp put_field(field, [{:field, schema} | opts]) do
+    opts =
+      case opts do
+        list when is_list(list) ->
+          if Keyword.has_key?(opts, :default),
+            do: Keyword.update!(opts, :default, &Macro.escape/1),
+            else: opts
+
+        other ->
+          other
+      end
+
     field
     |> put_field(schema)
     |> Map.put(:opts, opts)
