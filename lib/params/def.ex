@@ -1,5 +1,6 @@
 defmodule Params.Def do
   @moduledoc false
+  alias Params.Schema.Field
 
   @doc false
   defmacro defparams({func_name, _, _}, schema, do: block) do
@@ -53,17 +54,14 @@ defmodule Params.Def do
   def build_nested_schemas([], acc), do: acc
 
   def build_nested_schemas([schema | rest], acc) do
-    embedded = Keyword.has_key?(schema, :embeds) and schema[:inline]
+    inline? = Keyword.get(schema, :inline, false)
 
     acc =
-      if embedded do
-        sub_schema = Keyword.get(schema, :embeds)
+      if inline? do
+        sub_schema = Keyword.get(schema, :fields)
+        submodule = Keyword.get(schema, :field) |> elem(1)
 
-        module_def = {
-          sub_schema |> List.first() |> Keyword.get(:module),
-          Params.Def.gen_root_schema(sub_schema)
-        }
-
+        module_def = {submodule, Params.Def.gen_root_schema(sub_schema)}
         new_acc = [module_def | acc]
         build_nested_schemas(sub_schema, new_acc)
       else
@@ -73,17 +71,14 @@ defmodule Params.Def do
     build_nested_schemas(rest, acc)
   end
 
-  def module_concat(parent, name) do
-    Module.concat([parent, Macro.camelize("#{name}")])
-  end
-
   def gen_root_schema(schema) do
     quote location: :keep do
       use Params.Schema
 
-      @schema unquote(schema)
-      @required unquote(field_names(schema, &required?/1))
-      @optional unquote(field_names(schema, &optional?/1))
+      @schema unquote(Macro.escape(schema))
+      {required, optional} = unquote(schema |> Enum.split_with(& &1[:required]))
+      @required Enum.map(required, & &1[:name])
+      @optional Enum.map(optional, & &1[:name])
 
       schema do
         (unquote_splicing(schema_fields(schema)))
@@ -91,129 +86,30 @@ defmodule Params.Def do
     end
   end
 
-  defp required?(field_schema), do: Keyword.get(field_schema, :required, false)
-  defp optional?(field_schema), do: !required?(field_schema)
-
-  defp field_names(schema, filter) do
-    schema
-    |> Enum.filter(filter)
-    |> Enum.map(&Keyword.get(&1, :name))
-  end
-
   defp schema_fields(schema) do
     Enum.map(schema, &schema_field/1)
   end
 
-  defp schema_field(meta) do
-    call = field_call(meta)
-    name = Keyword.get(meta, :name)
-    type = field_type(meta)
-    opts = field_options(meta)
+  defp schema_field(field) do
+    {call, type} =
+      case field[:field] do
+        {:embeds_one, mod} -> {:embeds_one, mod}
+        {:embeds_many, mod} -> {:embeds_many, mod}
+        type -> {:field, type}
+      end
 
-    quote do
+    name = field[:name]
+    opts = field[:opts] || []
+
+    quote location: :keep do
       unquote(call)(unquote(name), unquote(type), unquote(opts))
     end
   end
 
-  defp field_call(meta) do
-    cond do
-      Keyword.get(meta, :field) ->
-        :field
-
-      Keyword.get(meta, :embeds_one) ->
-        :embeds_one
-
-      Keyword.get(meta, :embeds_many) ->
-        :embeds_many
-
-      Keyword.get(meta, :embeds) ->
-        "embeds_#{Keyword.fetch!(meta, :cardinality)}" |> String.to_atom()
-    end
-  end
-
-  defp field_type(meta) do
-    module = Keyword.get(meta, :module)
-    name = Keyword.get(meta, :name)
-
-    cond do
-      Keyword.get(meta, :field) -> Keyword.get(meta, :field)
-      Keyword.get(meta, :embeds) && meta[:inline] -> module_concat(module, name)
-      Keyword.get(meta, :embeds_one) -> Keyword.get(meta, :embeds_one)
-      Keyword.get(meta, :embeds_many) -> Keyword.get(meta, :embeds_many)
-    end
-  end
-
-  defp field_options(meta) do
-    Keyword.drop(meta, [
-      :module,
-      :name,
-      :field,
-      :embeds,
-      :inline,
-      :embeds_one,
-      :embeds_many,
-      :required,
-      :cardinality
-    ])
-  end
-
   def normalize_schema(dict, module) do
     Enum.reduce(dict, [], fn {k, v}, list ->
-      field =
-        {module, k, v}
-        |> normalize_field()
-        |> escape_default()
-
-      [field | list]
+      [Field.new(v, k, module) | list]
     end)
-  end
-
-  defp escape_default(field) do
-    case field[:default] do
-      nil -> field
-      default -> Keyword.put(field, :default, Macro.escape(default))
-    end
-  end
-
-  defp normalize_field({module, k, v}) do
-    required = String.ends_with?("#{k}", "!")
-    name = String.replace_trailing("#{k}", "!", "") |> String.to_atom()
-    normalize_field(v, name: name, required: required, module: module)
-  end
-
-  defp normalize_field({:embeds_one, embed_module}, options) do
-    [embeds: Params.Schema.__schema__(embed_module), embeds_one: embed_module] ++ options
-  end
-
-  defp normalize_field({:embeds_many, embed_module}, options) do
-    [embeds: Params.Schema.__schema__(embed_module), embeds_many: embed_module] ++ options
-  end
-
-  defp normalize_field(schema = %{}, options) do
-    module = module_concat(Keyword.get(options, :module), Keyword.get(options, :name))
-
-    [embeds: normalize_schema(schema, module), inline: true, embeds_one: module] ++ options
-  end
-
-  defp normalize_field(value, options) when is_atom(value) do
-    [field: value] ++ options
-  end
-
-  defp normalize_field({:array, x}, options) do
-    normalize_field([x], options)
-  end
-
-  defp normalize_field([schema], options) when is_map(schema) do
-    module = module_concat(Keyword.get(options, :module), Keyword.get(options, :name))
-    [embeds: normalize_schema(schema, module), inline: true, embeds_many: module] ++ options
-  end
-
-  defp normalize_field([{:field, x} | kw], options) do
-    normalize_field(x, options) ++ kw
-  end
-
-  defp normalize_field([value], options) do
-    [field: {:array, value}] ++ options
   end
 
   defp module_name(func_name, env) do

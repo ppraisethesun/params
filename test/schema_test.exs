@@ -79,7 +79,7 @@ defmodule Params.SchemaTest do
     defmodule LocationParams do
       use Params.Schema
 
-      @required ~w(latitude longitude)
+      @required ~w(latitude longitude)a
       schema do
         field(:latitude, :float)
         field(:longitude, :float)
@@ -89,7 +89,7 @@ defmodule Params.SchemaTest do
     defmodule BusParams do
       use Params.Schema
 
-      @required ~w(origin destination)
+      @required ~w(origin destination)a
       schema do
         embeds_one(:origin, LocationParams)
         embeds_one(:destination, LocationParams)
