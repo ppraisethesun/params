@@ -142,6 +142,7 @@ defmodule Params.Schema do
       |> Enum.reduce(data, fn {field, default_value}, acc ->
         Map.update!(acc, field, fn
           nil -> default_value
+          [] when default_value == :none -> nil
           value -> value
         end)
       end)
@@ -183,22 +184,24 @@ defmodule Params.Schema do
 
     default_embed = fn field ->
       name = Keyword.get(field, :name)
-      embed_params = Map.get(changeset_params, "#{name}", %{})
 
-      case field[:field] do
-        {:embeds_one, mod} ->
-          {name, default_embeds_from_schema(mod, embed_params, struct?)}
+      default =
+        case field[:field] do
+          {:embeds_one, mod} ->
+            embed_params = Map.get(changeset_params, "#{name}", %{})
+            default_embeds_from_schema(mod, embed_params, struct?)
 
-        {:embeds_many, mod} ->
-          {name,
-           case embed_params do
-             list when is_list(list) ->
-               Enum.map(list, &default_embeds_from_schema(mod, &1, struct?))
+          {:embeds_many, mod} ->
+            case Map.get(changeset_params, "#{name}", :none) do
+              list when is_list(list) ->
+                Enum.map(list, &default_embeds_from_schema(mod, &1, struct?))
 
-             other ->
-               other
-           end}
-      end
+              other ->
+                other
+            end
+        end
+
+      {name, default}
     end
 
     struct =
