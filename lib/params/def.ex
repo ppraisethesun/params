@@ -15,7 +15,7 @@ defmodule Params.Def do
         end
       end
 
-    cast_func = Module.eval_quoted(__CALLER__.module, def_cast_func(full, func_name))
+    cast_func = Code.eval_quoted(def_cast_func(full, func_name), [], __CALLER__)
 
     [defmod, with_alias, cast_func]
   end
@@ -31,7 +31,7 @@ defmodule Params.Def do
         end
       end
 
-    cast_func = Module.eval_quoted(__CALLER__.module, def_cast_func(full, func_name))
+    cast_func = Code.eval_quoted(def_cast_func(full, func_name), [], __CALLER__)
 
     [defmod, with_alias, cast_func]
   end
@@ -40,7 +40,7 @@ defmodule Params.Def do
   defmacro defschema(schema) do
     quote location: :keep, bind_quoted: [schema: schema] do
       normalized_schema = Params.Def.normalize_schema(schema, __MODULE__)
-      Module.eval_quoted(__MODULE__, Params.Def.gen_root_schema(normalized_schema))
+      Code.eval_quoted(Params.Def.gen_root_schema(normalized_schema), [], __ENV__)
 
       normalized_schema
       |> Params.Def.build_nested_schemas()

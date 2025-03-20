@@ -262,7 +262,7 @@ defmodule Params.Schema do
 
   @relations [:embed, :assoc]
   defp relation_partition(module, names) do
-    types = module.__changeset__
+    types = module.__changeset__()
 
     Enum.reduce(names, {[], []}, fn name, {fields, relations} ->
       case Map.get(types, name) do
