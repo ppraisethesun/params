@@ -32,7 +32,7 @@ defmodule Params.Schema do
 
   @doc false
   defmacro __using__([]) do
-    quote location: :keep do
+    quote location: :keep, generated: true do
       import Params.Schema, only: [schema: 1]
       unquote(__use__(:ecto))
       unquote(__use__(:params))
@@ -40,7 +40,7 @@ defmodule Params.Schema do
   end
 
   defmacro __using__(schema) do
-    quote location: :keep, bind_quoted: [schema: schema] do
+    quote location: :keep, generated: true, bind_quoted: [schema: schema] do
       import Params.Def
 
       defschema(schema)
@@ -49,7 +49,7 @@ defmodule Params.Schema do
 
   @doc false
   defmacro schema(do: definition) do
-    quote location: :keep do
+    quote location: :keep, generated: true do
       Ecto.Schema.embedded_schema do
         unquote(definition)
       end
@@ -57,7 +57,7 @@ defmodule Params.Schema do
   end
 
   defp __use__(:ecto) do
-    quote location: :keep do
+    quote location: :keep, generated: true do
       use Ecto.Schema
       import Ecto.Changeset
       @primary_key false
@@ -65,7 +65,7 @@ defmodule Params.Schema do
   end
 
   defp __use__(:params) do
-    quote location: :keep do
+    quote location: :keep, generated: true do
       Module.register_attribute(__MODULE__, :required, persist: true)
       Module.register_attribute(__MODULE__, :optional, persist: true)
       Module.register_attribute(__MODULE__, :schema, persist: true)
